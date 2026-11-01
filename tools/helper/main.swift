@@ -68,14 +68,23 @@ func handle(conn: NWConnection, head: String, body: Data) {
     task.arguments = ["-g", "/Applications/BreezeTTS.app"]
     try? task.run()
 
-    proxy(conn: conn, method: method, path: path, body: body, attempt: 0)
+    proxy(conn: conn, method: method, path: path, head: head, body: body, attempt: 0)
 }
 
-func proxy(conn: NWConnection, method: String, path: String, body: Data, attempt: Int) {
+func proxy(conn: NWConnection, method: String, path: String, head: String, body: Data, attempt: Int) {
     let c = NWConnection(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: appPort)!, using: .tcp)
     c.stateUpdateHandler = { state in
         if state == .ready {
-            var req = "\(method) \(path) HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            var req = "\(method) \(path) HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: \(body.count)\r\nConnection: close\r\n"
+            // 原样转发客户端的其余请求头。之前这里只重写了 Host/Content-Length，
+            // X-Breeze-Token 被丢掉，于是经 4747 进来的 POST 全部被判 401。
+            for line in head.split(separator: "\r\n").dropFirst() {
+                let lower = line.lowercased()
+                if lower.hasPrefix("host:") || lower.hasPrefix("connection:")
+                    || lower.hasPrefix("content-length:") || lower.hasPrefix("accept-encoding:") { continue }
+                req += line + "\r\n"
+            }
+            req += "\r\n"
             var payload = Data(req.utf8); payload.append(body)
             c.send(content: payload, completion: .contentProcessed { err in
                 var out = Data()
@@ -90,7 +99,7 @@ func proxy(conn: NWConnection, method: String, path: String, body: Data, attempt
             })
         } else if case .failed = state, attempt < 60 {
             DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
-                proxy(conn: conn, method: method, path: path, body: body, attempt: attempt + 1)
+                proxy(conn: conn, method: method, path: path, head: head, body: body, attempt: attempt + 1)
             }
         } else if case .failed = state {
             let msg = "HTTP/1.1 502 Bad Gateway\r\nContent-Type: application/json\r\n\r\n{\"error\":\"app not reachable\"}"

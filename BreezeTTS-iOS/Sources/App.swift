@@ -99,6 +99,7 @@ struct RootView: View {
         @State private var showHistory = false
         @State private var tab = 0
         @State private var text = ""
+        @State private var abText = ""
 
         var body: some View {
             VStack(spacing: 0) {
@@ -110,7 +111,7 @@ struct RootView: View {
                     ComposerView(client: client, player: player, text: $text)
                         .opacity(tab == 0 ? 1 : 0)
                         .allowsHitTesting(tab == 0)
-                    AudiobookContent(client: client, player: player)
+                    AudiobookContent(client: client, player: player, text: $abText)
                         .opacity(tab == 1 ? 1 : 0)
                         .allowsHitTesting(tab == 1)
                     if client.macChatEnabled {
@@ -136,6 +137,18 @@ struct RootView: View {
                 if env["BREEZE_DEBUG_VOICE"] == "1" { showVoiceMenu = true }
                 if env["BREEZE_DEBUG_HISTORY"] == "1" { showHistory = true }
                 if let sample = env["BREEZE_DEBUG_TEXT"] { text = sample }
+                if env["BREEZE_DEBUG_GENERATE"] == "1" {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !t.isEmpty { client.generate(text: t, instruction: nil) }
+                    }
+                }
+                if let sample = env["BREEZE_DEBUG_AB_TEXT"] { abText = sample }
+                if env["BREEZE_DEBUG_AB_ANALYZE"] == "1", abText.count >= 20 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                        client.audiobookAnalyze(text: abText)
+                    }
+                }
                 #endif
             }
         }
@@ -207,11 +220,14 @@ struct RootView: View {
                     .buttonStyle(.plain)
                 }
 
-                // 音色 / 生成只在「合成」页出现，听书和对话页各用自己的操作。
+                // 右侧动作跟随当前页：合成页是「音色 + 生成」，听书页是那一步该做的事
                 if tab == 0 {
                     hairline
                     voiceButton
                     generateButton
+                } else if tab == 1 {
+                    hairline
+                    audiobookButton
                 }
             }
             .padding(.horizontal, 8)
@@ -254,31 +270,92 @@ struct RootView: View {
             client.state != .generating && !trimmedText.isEmpty
         }
 
-        private var generateButton: some View {
-            Button {
-                guard canGenerate else { return }
-                client.generate(text: trimmedText, instruction: nil)
-            } label: {
+        /// 胶囊里的主操作按钮：可用时实心主色 + 反色文字，不可用时降为浅灰。
+        private func capAction(_ title: String,
+                               icon: String?,
+                               enabled: Bool,
+                               busy: Bool = false,
+                               action: @escaping () -> Void) -> some View {
+            Button(action: { if enabled { action() } }) {
                 HStack(spacing: 5) {
-                    if client.state == .generating {
+                    if busy {
                         ProgressView().controlSize(.mini).tint(.primary)
-                    } else {
-                        Image(systemName: "waveform").font(.system(size: 11, weight: .bold))
+                    } else if let icon {
+                        Image(systemName: icon).font(.system(size: 11, weight: .bold))
                     }
-                    Text(client.state == .generating ? "合成中" : "生成")
+                    Text(title)
                         .font(.system(size: 12.5, weight: .semibold))
+                        .lineLimit(1)
+                        .monospacedDigit()
                 }
-                .foregroundStyle(client.state == .generating ? Color.primary
-                                 : (canGenerate ? Theme.inverse : Color.secondary))
+                .foregroundStyle(busy ? Color.primary : (enabled ? Theme.inverse : Color.secondary))
                 .padding(.horizontal, 13)
                 .padding(.vertical, 8)
-                .background(Capsule().fill(client.state == .generating
-                                           ? Color.primary.opacity(0.08)
-                                           : Color.primary.opacity(canGenerate ? 1 : 0.1)))
+                .background(Capsule().fill(busy ? Color.primary.opacity(0.08)
+                                                : Color.primary.opacity(enabled ? 1 : 0.1)))
             }
             .buttonStyle(.plain)
-            .disabled(!canGenerate)
-            .animation(.easeOut(duration: 0.2), value: canGenerate)
+            .disabled(!enabled)
+            .animation(.easeOut(duration: 0.2), value: enabled)
+        }
+
+        private var generateButton: some View {
+            capAction(client.state == .generating ? "合成中" : "生成",
+                      icon: client.state == .generating ? nil : "waveform",
+                      enabled: canGenerate,
+                      busy: client.state == .generating) {
+                client.generate(text: trimmedText, instruction: nil)
+            }
+        }
+
+        // MARK: 听书页的主操作：分析 → 生成 → 下载 → 播放，同一位置推进
+
+        private var trimmedABText: String {
+            abText.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        @ViewBuilder
+        private var audiobookButton: some View {
+            if client.abAnalyzing {
+                capAction("分析中", icon: nil, enabled: false, busy: true) {}
+            } else if client.abGenerating {
+                capAction("合成 \(Int((client.abProgress * 100).rounded()))%",
+                          icon: nil, enabled: false, busy: true) {}
+            } else if client.abAudioID != nil {
+                // 已经合成了：下载 → 播放
+                if client.abDownloadedData == nil {
+                    let p = client.abDownloadProgress
+                    let downloading = (p ?? 0) < 1
+                    capAction(downloading ? "下载 \(Int(((p ?? 0) * 100).rounded()))%" : "下载音频",
+                              icon: "arrow.down.circle.fill",
+                              enabled: !downloading,
+                              busy: downloading) {
+                        client.downloadAudiobook()
+                    }
+                } else {
+                    capAction(player.isPlaying ? "暂停" : "播放",
+                              icon: player.isPlaying ? "pause.fill" : "play.fill",
+                              enabled: true) {
+                        if player.player != nil {
+                            player.toggle()
+                        } else if let data = client.abDownloadedData {
+                            player.play(data, title: "听书")
+                        }
+                    }
+                }
+            } else if client.abSegments > 0 {
+                // 分句完成（人物识别失败走规则解析也算），可以直接合成
+                capAction("生成 \(client.abSegments) 段",
+                          icon: "waveform.badge.plus",
+                          enabled: true) {
+                    client.audiobookGenerate()
+                }
+            } else {
+                capAction("分析人物", icon: "text.magnifyingglass",
+                          enabled: trimmedABText.count >= 20) {
+                    client.audiobookAnalyze(text: trimmedABText)
+                }
+            }
         }
     }
 }
@@ -324,12 +401,15 @@ struct ComposerView: View {
                         .padding(.horizontal, 20)
                 }
 
-                Text(client.statusText.isEmpty
-                     ? (client.state == .ready ? "Mac 已就绪 · \(client.voiceCatalog.count) 个音色" : "")
-                     : client.statusText)
-                    .font(.system(size: 10.5)).foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .padding(.bottom, 10)
+                // 合成中进度卡片已经带状态文字了，下面这行只在空闲时显示，避免重复
+                if client.state != .generating {
+                    Text(client.statusText.isEmpty
+                         ? (client.state == .ready ? "Mac 已就绪 · \(client.voiceCatalog.count) 个音色" : "")
+                         : client.statusText)
+                        .font(.system(size: 10.5)).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .padding(.bottom, 10)
+                }
             }
         }
     }
@@ -628,7 +708,7 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
 struct AudiobookContent: View {
     @ObservedObject var client: RemoteClient
     @ObservedObject var player: AudioBox
-    @State private var text = ""
+    @Binding var text: String
 
     var body: some View {
         ScrollView {
@@ -650,19 +730,7 @@ struct AudiobookContent: View {
                                 .padding(10)
                         }
                         .background(RoundedRectangle(cornerRadius: 14).fill(Theme.faint))
-                        Button {
-                            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard trimmed.count >= 20 else { return }
-                            client.audiobookAnalyze(text: trimmed)
-                        } label: {
-                            Label("发送到 Mac 分析人物", systemImage: "text.magnifyingglass")
-                                .font(.system(size: 14, weight: .semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Capsule().fill(Color.primary.opacity(0.1)))
-                        }
-                        .buttonStyle(.plain)
-                        Text("整本小说贴进来（或发 .txt 到 Mac 端）。Mac 会先识别人物并锁定每人声线，再逐句标注情绪——同一角色全文音色一致。分析引擎用 Mac 设置里的本地/云端配置。")
+                        Text("贴好后点底部「分析人物」。整本小说可以直接贴（或发 .txt 到 Mac 端）。Mac 会先识别人物并锁定每人声线，再逐句标注情绪——同一角色全文音色一致。分析引擎用 Mac 设置里的本地/云端配置。")
                             .font(.system(size: 10.5)).foregroundStyle(.secondary)
                     }
 
@@ -697,20 +765,6 @@ struct AudiobookContent: View {
                         }
                         .padding(12)
                         .background(RoundedRectangle(cornerRadius: 14).fill(Theme.faint))
-
-                        if !client.abGenerating {
-                            Button {
-                                client.audiobookGenerate()
-                            } label: {
-                                Label("生成听书音频（\(client.abSegments) 段）", systemImage: "waveform.badge.plus")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(Capsule().fill(Color.primary.opacity(0.1)))
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(client.abSegments == 0)
-                        }
                     }
 
                     if client.abGenerating {
@@ -726,17 +780,8 @@ struct AudiobookContent: View {
                                              label: "正在下载听书音频…",
                                              remaining: nil)
                         } else if client.abDownloadedData == nil {
-                            Button {
-                                client.downloadAudiobook()
-                            } label: {
-                                Label("下载听书音频（\(client.clock(client.abAudioDuration))）",
-                                      systemImage: "arrow.down.circle.fill")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(Capsule().fill(Color.primary.opacity(0.1)))
-                            }
-                            .buttonStyle(.plain)
+                            Text("音频已合成好，点底部「下载音频」存到本机（\(client.clock(client.abAudioDuration))）")
+                                .font(.system(size: 10.5)).foregroundStyle(.secondary)
                         } else {
                             audiobookPlayer
                         }

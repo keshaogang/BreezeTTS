@@ -383,22 +383,35 @@ final class RemoteClient: ObservableObject {
 
         URLSession.shared.dataTask(with: mutable) { [weak self] data, response, _ in
             guard let self else { return }
-            if (response as? HTTPURLResponse)?.statusCode == 409 {
-                DispatchQueue.main.async { self.state = .failed("Mac 正在忙别的合成，稍后再试") }
-                return
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let object = (try? JSONSerialization.jsonObject(with: data ?? Data())) as? [String: Any]
+            DispatchQueue.main.async {
+                if code == 409 {
+                    self.state = .failed("Mac 正在忙别的合成，稍后再试")
+                    return
+                }
+                guard let id = object?["id"] as? String else {
+                    let reason = object?["error"] as? String
+                    self.state = .failed(reason == "bad token"
+                                         ? "配对码对不上，去设置里重新扫一次码"
+                                         : "发送失败：连不上 Mac（HTTP \(code)）")
+                    return
+                }
+                self.startPolling(job: id, start: Date())
             }
-            guard let data, let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let id = object["id"] as? String else {
-                DispatchQueue.main.async { self.state = .failed("发送失败：无法连接 Mac") }
-                return
-            }
-            self.startPolling(job: id, start: Date())
         }.resume()
     }
 
+    /// 轮询必须挂在主 RunLoop 上。
+    ///
+    /// 之前的写法是 `Timer.scheduledTimer`，它把 timer 加到**当前线程**的 RunLoop。
+    /// 这个函数是从 URLSession 的完成回调里调用的——那是个后台队列，RunLoop 根本
+    /// 不跑，于是 timer 一次都不触发：进度永远停在初始的 4%，而 Mac 那边其实早就
+    /// 合成完了。改成 RunLoop.main + .common，滚动列表时也不会停。
     private func startPolling(job id: String, start: Date) {
         pollTimer?.invalidate()
-        let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+        var misses = 0
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
             guard let base = self.base else { timer.invalidate(); return }
             var request = URLRequest(url: base.appendingPathComponent("job/\(id)"))
@@ -406,13 +419,26 @@ final class RemoteClient: ObservableObject {
             if !self.token.isEmpty { request.setValue(self.token, forHTTPHeaderField: "X-Breeze-Token") }
             URLSession.shared.dataTask(with: request) { data, _, _ in
                 let object = (try? JSONSerialization.jsonObject(with: data ?? Data())) as? [String: Any] ?? [:]
-                let jobState = object["state"] as? String ?? "running"
+                let jobState = object["state"] as? String
                 DispatchQueue.main.async {
                     if let fraction = object["fraction"] as? Double {
                         self.progress = fraction
+                        // 一旦拿到真实进度，就别再挂着「已发送，等待…」了
+                        if self.statusText.hasPrefix("已发送") { self.statusText = "Mac 合成中" }
                     }
                     self.remaining = object["remaining"] as? Double
-                    if jobState == "running", Date().timeIntervalSince(start) < 1800 { return }
+                    // 拿不到 state 说明已经连不上 Mac（或者这个 job 被顶掉了），
+                    // 别让用户对着一个假进度等 30 分钟。
+                    guard let jobState else {
+                        misses += 1
+                        if misses > 15 {
+                            timer.invalidate()
+                            self.state = .failed("和 Mac 的连接断了，检查一下是否在同一网络")
+                        }
+                        return
+                    }
+                    misses = 0
+                    if jobState == "running", Date().timeIntervalSince(start) < 900 { return }
                     timer.invalidate()
                     if jobState == "done" {
                         self.download(id: id, start: start)
@@ -422,6 +448,7 @@ final class RemoteClient: ObservableObject {
                 }
             }.resume()
         }
+        RunLoop.main.add(timer, forMode: .common)
         pollTimer = timer
     }
 
