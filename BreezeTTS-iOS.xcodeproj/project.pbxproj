@@ -1,0 +1,111 @@
+// !$*UTF8*$!
+{
+	objectVersion = 56;
+	objects = {
+/* Begin PBXBuildFile section */
+		3C3E7561C74959FC84406BB4 /* App.swift */ = {isa = PBXBuildFile; fileRef = 5BE1D82FBE135137AA7CE5FA /* App.swift */; };
+		A99AECD560AA5FB9913B408C /* Remote.swift */ = {isa = PBXBuildFile; fileRef = CFDA8DE14AA051DF9428FD74 /* Remote.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		5BE1D82FBE135137AA7CE5FA /* App.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		CFDA8DE14AA051DF9428FD74 /* Remote.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Remote.swift; sourceTree = "<group>"; };
+		D856B00056E05F62A6F3E6A0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		481B333A17625434BAE79FB3 /* BreezeTTS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BreezeTTS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8E4F62BFE93052B292CA20C8 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1F64C067ACF25034A5D092D5 = {isa = PBXGroup; children = (2DB1B284B5A85FA4A7713469, 481B333A17625434BAE79FB3); sourceTree = "<group>"; };
+		2DB1B284B5A85FA4A7713469 /* Sources */ = {isa = PBXGroup; children = (D856B00056E05F62A6F3E6A0, 5BE1D82FBE135137AA7CE5FA /* App.swift */, CFDA8DE14AA051DF9428FD74 /* Remote.swift */); path = BreezeTTS-iOS/Sources; sourceTree = SOURCE_ROOT; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		61CCE653B4C5566480A0A709 = {isa = PBXNativeTarget; buildConfigurationList = 4632F4CF30E6563E99EEABDC; buildPhases = (D924ADE6C160596882CAD11A, 8E4F62BFE93052B292CA20C8, 0AB1A3D32A905C4C9F11CDB4); buildRules = (); dependencies = (); name = BreezeTTSiOS; productName = BreezeTTSiOS; productReference = 481B333A17625434BAE79FB3; productType = "com.apple.product-type.application"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		35EC0FB9AA8E5F82A360DFBF = {isa = PBXProject; attributes = { LastSwiftUpdateCheck = 1600; }; buildConfigurationList = F6E8B9D4DCAF5EB2A027B8C3; compatibilityVersion = "Xcode 14.0"; developmentRegion = zh-Hans; hasScannedForEncodings = 0; knownRegions = (zh, en, Base); mainGroup = 1F64C067ACF25034A5D092D5; targetAttributes = { 61CCE653B4C5566480A0A709 = {}; }; targets = (61CCE653B4C5566480A0A709); };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0AB1A3D32A905C4C9F11CDB4 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D924ADE6C160596882CAD11A = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (3C3E7561C74959FC84406BB4 /* App.swift */, A99AECD560AA5FB9913B408C /* Remote.swift */); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		836F2067EA835F4CBACE3246 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		FA26D90D9CDD5AE3A99FCC38 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		F5B2245A359C5F16A086A34E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = "com.breezespeak.app";
+				PRODUCT_NAME = "BreezeTTS";
+				DEVELOPMENT_TEAM = 6S7H7VW64C;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				OTHER_SWIFT_FLAGS = "-disable-sandbox";
+				INFOPLIST_FILE = "BreezeTTS-iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		5CC046C8FDF355CF8C68C59C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = "com.breezespeak.app";
+				PRODUCT_NAME = "BreezeTTS";
+				DEVELOPMENT_TEAM = 6S7H7VW64C;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				OTHER_SWIFT_FLAGS = "-disable-sandbox";
+				INFOPLIST_FILE = "BreezeTTS-iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4632F4CF30E6563E99EEABDC = {isa = XCConfigurationList; buildConfigurations = (F5B2245A359C5F16A086A34E, 5CC046C8FDF355CF8C68C59C); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		F6E8B9D4DCAF5EB2A027B8C3 = {isa = XCConfigurationList; buildConfigurations = (836F2067EA835F4CBACE3246, FA26D90D9CDD5AE3A99FCC38); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = 35EC0FB9AA8E5F82A360DFBF;
+}

@@ -1,0 +1,29 @@
+# Build products & local artifacts
+build/
+build-static/
+dist/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+
+# SwiftPM / Xcode transient
+*.xcresult
+*.ipa
+*.dSYM.zip
+
+# Local engine build intermediates (Vendor dylib IS committed)
+*.o
+*.obj
+
+# Third-party sources & build trees fetched by scripts (llama.cpp)
+tools/llama-src/
+tools/llama-build/
+
+# Duplicate of BreezeTTS/Resources/llama-bin (only the Resources copy ships)
+Vendor/llama-bin/
+
+# Scratch
+ios-tmp/
+onboarding-pair
+*.tmp
