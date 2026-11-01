@@ -95,30 +95,47 @@ struct RootView: View {
         @ObservedObject var client: RemoteClient
         @ObservedObject var player: AudioBox
         @State private var showSettings = false
+        @State private var showVoiceMenu = false
+        @State private var showHistory = false
         @State private var tab = 0
+        @State private var text = ""
 
         var body: some View {
             VStack(spacing: 0) {
                 header
-                TabView(selection: $tab) {
-                    ComposerView(client: client, player: player)
-                        .tabItem { Label("合成", systemImage: "waveform") }
-                        .tag(0)
-                    NavigationStack { AudiobookContent(client: client, player: player) }
-                        .tabItem { Label("听书", systemImage: "book") }
-                        .tag(1)
+                // 不用原生 TabView：它在 iOS 26 上自带悬浮标签栏，隐藏后仍会留残影，
+                // 且 iPad 上会跑成顶部样式。这里用叠放 + 显隐切换，三页状态都保留，
+                // 底部只留一个和 Mac 一样的胶囊导航。
+                ZStack {
+                    ComposerView(client: client, player: player, text: $text)
+                        .opacity(tab == 0 ? 1 : 0)
+                        .allowsHitTesting(tab == 0)
+                    AudiobookContent(client: client, player: player)
+                        .opacity(tab == 1 ? 1 : 0)
+                        .allowsHitTesting(tab == 1)
                     if client.macChatEnabled {
                         ChatTab(client: client, player: player)
-                            .tabItem { Label("对话", systemImage: "bubble.left.and.bubble.right") }
-                            .tag(2)
+                            .opacity(tab == 2 ? 1 : 0)
+                            .allowsHitTesting(tab == 2)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            // iPad 上正文别横到屏幕两端，跟 Mac 一样收成居中的一列
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+            .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            .sheet(isPresented: $showSettings) { SettingsSheet(client: client) }
+            .sheet(isPresented: $showVoiceMenu) { VoiceMenuSheet(client: client) }
+            .sheet(isPresented: $showHistory) { HistorySheet(client: client, player: player) }
             .task {
                 #if DEBUG
                 let env = ProcessInfo.processInfo.environment
                 if let raw = env["BREEZE_DEBUG_TAB"], let value = Int(raw) { tab = value }
                 if env["BREEZE_DEBUG_SETTINGS"] == "1" { showSettings = true }
+                if env["BREEZE_DEBUG_VOICE"] == "1" { showVoiceMenu = true }
+                if env["BREEZE_DEBUG_HISTORY"] == "1" { showHistory = true }
+                if let sample = env["BREEZE_DEBUG_TEXT"] { text = sample }
                 #endif
             }
         }
@@ -137,6 +154,11 @@ struct RootView: View {
                 .padding(.horizontal, 9).padding(.vertical, 5)
                 .background(Capsule().fill(Color.primary.opacity(0.07)))
 
+                Button { showHistory = true } label: {
+                    Image(systemName: "clock.arrow.circlepath").font(.system(size: 13))
+                }
+                .buttonStyle(.plain)
+
                 Button { client.checkStatus(); client.fetchSettings(); client.fetchHistory() } label: {
                     Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 13))
                 }
@@ -148,7 +170,115 @@ struct RootView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 6)
-            .sheet(isPresented: $showSettings) { SettingsSheet(client: client) }
+        }
+
+        // MARK: - 底部导航（一个胶囊装下：模式切换 + 音色 + 生成）
+
+        private struct Mode {
+            var tag: Int
+            var title: String
+            var icon: String
+        }
+
+        private var modes: [Mode] {
+            var list = [Mode(tag: 0, title: "合成", icon: "waveform"),
+                        Mode(tag: 1, title: "听书", icon: "book")]
+            if client.macChatEnabled {
+                list.append(Mode(tag: 2, title: "对话", icon: "bubble.left.and.bubble.right"))
+            }
+            return list
+        }
+
+        private var bottomBar: some View {
+            HStack(spacing: 4) {
+                ForEach(modes, id: \.tag) { mode in
+                    Button {
+                        withAnimation(.easeOut(duration: 0.18)) { tab = mode.tag }
+                    } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: mode.icon).font(.system(size: 14, weight: .medium))
+                            Text(mode.title).font(.system(size: 9.5, weight: .medium))
+                        }
+                        .foregroundStyle(tab == mode.tag ? Color.primary : Color.secondary)
+                        .frame(width: 46, height: 40)
+                        .background(RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(tab == mode.tag ? Color.primary.opacity(0.08) : Color.clear))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // 音色 / 生成只在「合成」页出现，听书和对话页各用自己的操作。
+                if tab == 0 {
+                    hairline
+                    voiceButton
+                    generateButton
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(Capsule(style: .continuous).fill(.ultraThinMaterial))
+            .overlay(Capsule(style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+            .shadow(color: Color.black.opacity(0.12), radius: 18, y: 6)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 2)
+        }
+
+        private var hairline: some View {
+            Rectangle().fill(Color.primary.opacity(0.12)).frame(width: 1, height: 22)
+        }
+
+        private var voiceButton: some View {
+            Button { showVoiceMenu = true } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.wave.2").font(.system(size: 11))
+                    Text(client.macVoice.isEmpty ? "音色" : client.macVoice)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Image(systemName: "chevron.down").font(.system(size: 7))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 8)
+                .frame(maxWidth: 96)
+                .background(Capsule().fill(Color.primary.opacity(0.06)))
+            }
+            .buttonStyle(.plain)
+        }
+
+        private var trimmedText: String {
+            text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        private var canGenerate: Bool {
+            client.state != .generating && !trimmedText.isEmpty
+        }
+
+        private var generateButton: some View {
+            Button {
+                guard canGenerate else { return }
+                client.generate(text: trimmedText, instruction: nil)
+            } label: {
+                HStack(spacing: 5) {
+                    if client.state == .generating {
+                        ProgressView().controlSize(.mini).tint(.primary)
+                    } else {
+                        Image(systemName: "waveform").font(.system(size: 11, weight: .bold))
+                    }
+                    Text(client.state == .generating ? "合成中" : "生成")
+                        .font(.system(size: 12.5, weight: .semibold))
+                }
+                .foregroundStyle(client.state == .generating ? Color.primary
+                                 : (canGenerate ? Theme.inverse : Color.secondary))
+                .padding(.horizontal, 13)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(client.state == .generating
+                                           ? Color.primary.opacity(0.08)
+                                           : Color.primary.opacity(canGenerate ? 1 : 0.1)))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canGenerate)
+            .animation(.easeOut(duration: 0.2), value: canGenerate)
         }
     }
 }
@@ -158,37 +288,10 @@ struct RootView: View {
 struct ComposerView: View {
     @ObservedObject var client: RemoteClient
     @ObservedObject var player: AudioBox
-    @State private var text = ""
-    @State private var showVoiceMenu = false
-    @State private var showHistory = false
+    @Binding var text: String
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Button { showVoiceMenu = true } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "waveform.badge.plus").font(.system(size: 11))
-                        Text(client.macVoice.isEmpty ? "选择音色" : client.macVoice)
-                            .font(.system(size: 11.5)).lineLimit(1)
-                        Image(systemName: "chevron.down").font(.system(size: 8))
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(Capsule().fill(Color.primary.opacity(0.07)))
-                }
-                .buttonStyle(.plain)
-                Spacer()
-                Button { showHistory = true } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "clock.arrow.circlepath").font(.system(size: 11))
-                        Text("历史").font(.system(size: 11.5))
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(Capsule().fill(Color.primary.opacity(0.07)))
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 20).padding(.top, 6)
-
             // 与 Mac 端一致：正文直接写在画布上，不套灰底卡片
             ZStack(alignment: .topLeading) {
                 if text.isEmpty {
@@ -220,35 +323,15 @@ struct ComposerView: View {
                     TransportBar(player: player)
                         .padding(.horizontal, 20)
                 }
-                Button {
-                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    client.generate(text: trimmed, instruction: nil)
-                } label: {
-                    HStack {
-                        Image(systemName: client.state == .generating ? "hourglass" : "waveform")
-                        Text(client.state == .generating ? "Mac 合成中" : "生成语音")
-                    }
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Capsule().fill(Color.primary.opacity(client.state == .generating || text.isEmpty ? 0.04 : 0.1)))
-                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15)))
-                }
-                .buttonStyle(.plain)
-                .disabled(client.state == .generating || text.isEmpty)
-                .padding(.horizontal, 20)
 
                 Text(client.statusText.isEmpty
                      ? (client.state == .ready ? "Mac 已就绪 · \(client.voiceCatalog.count) 个音色" : "")
                      : client.statusText)
                     .font(.system(size: 10.5)).foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 10)
             }
         }
-        .sheet(isPresented: $showVoiceMenu) { VoiceMenuSheet(client: client) }
-        .sheet(isPresented: $showHistory) { HistorySheet(client: client, player: player) }
     }
 }
 
@@ -1172,6 +1255,8 @@ struct QRScannerView: UIViewRepresentable {
 enum Theme {
     static var canvas: Color { Color(uiColor: .systemBackground) }
     static var faint: Color { Color.primary.opacity(0.05) }
+    /// 实心主色按钮上的反色文字
+    static var inverse: Color { Color(uiColor: .systemBackground) }
 }
 
 // MARK: - Shortcuts（快捷指令）
