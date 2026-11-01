@@ -1,0 +1,49 @@
+#pragma once
+
+#include "breeze/model.h"
+
+#include <string>
+#include <vector>
+
+namespace breeze {
+
+struct MimiCodec {
+    BreezeModel * m = nullptr;
+    // own compute instance for the vocoder so decode() can run on a worker
+    // thread while the backbone keeps stepping on the main one. Two Metal
+    // instances on the same device interleave their command buffers; on CPU
+    // we share the model backend instead (a second CPU instance would fight
+    // over the same cores).
+    Backend voc_be;
+    void init(BreezeModel & model);
+    void free_backend();
+
+    // true when decode() may safely run concurrently with backbone/depth work
+    bool parallel_decode() const { return voc_be.backend != nullptr && voc_be.is_gpu; }
+
+    // codes frame-major [f * n_cb + cb]; n_cb 0 means the full set. fewer codebooks drops detail,
+    // 1 leaves only the semantic stage
+    std::vector<float> decode(const std::vector<int> & codes, int n_frames, int n_cb = 0);
+    // audio waveform in, returns codes frame-major, sets n_frames
+    std::vector<int> encode(const std::vector<float> & audio, int & n_frames);
+};
+
+namespace codec_detail {
+
+ggml_tensor * conv1d_causal(ggml_context * ctx, ggml_tensor * w, ggml_tensor * b,
+                            ggml_tensor * x, int stride, int dilation);
+ggml_tensor * convtr1d_causal(ggml_context * ctx, ggml_tensor * w, ggml_tensor * b,
+                              ggml_tensor * x, int stride);
+ggml_tensor * depthwise1d_causal(ggml_context * ctx, ggml_tensor * w, ggml_tensor * b,
+                                 ggml_tensor * x, int kernel);
+ggml_tensor * resnet_block(ggml_context * ctx, BreezeModel & m, const std::string & prefix, ggml_tensor * x);
+ggml_tensor * seanet_encoder(ggml_context * ctx, BreezeModel & m, ggml_tensor * x);
+ggml_tensor * mimi_transformer(ggml_context * ctx, BreezeModel & m, Graph & g, ggml_tensor * x,
+                               const std::string & prefix, int seq_len);
+ggml_tensor * vocoder_transformer(ggml_context * ctx, BreezeModel & m, Graph & g, ggml_tensor * x, int seq_len);
+ggml_tensor * vocoder_decode(ggml_context * ctx, BreezeModel & m, Graph & g,
+                             const std::vector<int> & codes, int n_codebooks, int seq_len);
+
+}
+
+}
