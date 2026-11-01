@@ -1,11 +1,14 @@
-# Breeze TTS for macOS
+# Breeze TTS
 
-原生 macOS 语音合成应用。SwiftUI 界面 + Objective-C++ 桥 + Breeze-TTS-2.cpp 的 C++ 引擎，
-**没有 WebView、没有本地 HTTP 服务、没有浏览器**，推理全部在进程内完成。
+原生语音合成应用：**macOS 完整版 + iPhone / iPad 远程端**。SwiftUI 界面 + Objective-C++ 桥 + Breeze-TTS-2.cpp 的 C++ 引擎，
+**没有 WebView、没有浏览器**，推理全部在 Mac 进程内完成，手机只是显示器与遥控器。
 
 - 引擎：[`HoppouAI/Breeze-TTS-2.cpp`](https://github.com/HoppouAI/Breeze-TTS-2.cpp)（Metal 后端）
-- 界面：SwiftUI，液态玻璃（macOS 26+）/ 毛玻璃（macOS 13–25）自动降级
-- 产物：Universal Binary（arm64 + x86_64）`.app`
+- 界面：SwiftUI，液态玻璃（macOS 26+）/ 毛玻璃（macOS 13–25）自动降级；iOS 端与 Mac 完全对等
+- 产物：Universal Binary（arm64 + x86_64）`.app` / `.dmg`，以及 iOS `.ipa`
+- 版本：2.0.0，macOS 12+，bundle id `com.breezespeak.mac`（Mac）/ `com.breezespeak.app`（iOS）
+
+> 完整版（本仓库）才有配对服务与听书、对话；Lite 版是独立分支，不能和手机绑定。
 
 ## 快速开始
 
@@ -96,6 +99,17 @@ LLM 也是两次独立调用：
 
 设置 → 听书分析里两个开关：**自动识别新角色人设**（默认开）、**识别到新角色自动打开角色面板**（默认关）。
 
+## 对话
+
+气泡式会话，回复可以直接用当前音色读出来（生成中边出边播，气泡下方带进度）。
+
+- **双后端**：本地 `llama.cpp` 子进程（`Resources/llama-bin`，默认）或任意 OpenAI 兼容云端 API（设置 → 对话填 base URL + key），
+  本地不可用时按设置顺序回退，两边都没有会在消息流里直接报「未配置」
+- 上下文只带最近 20 条，防止小模型被长历史拖垮
+- 支持附图（视觉模型），图片以 base64 data URL 直传
+- 可以整段重读、清空会话；历史对话记录在「历史」里和合成音频分开存
+- 系统提示写死为「简洁口语化、三句以内」，因为它同时是要拿去朗读的稿子
+
 ## 与 iPhone / iPad 配对
 
 只有**完整版**（bundle id `com.breezespeak.mac`）会开配对服务，精简版没有——这是有意的。
@@ -104,6 +118,34 @@ LLM 也是两次独立调用：
 - 手机扫码后走 `POST /pair` 校验，`edition != full` 直接拒绝
 - 配对后手机能调：`/status`、`/audiobook/*`（含 `/audiobook/role`、`/audiobook/ref`）、`/chat`、`/history`
 - 端口 4747 被占用时自动回落 4748
+
+### 装 iOS 端
+
+```bash
+# 生成工程（首次或改了 iOS 源码列表后）
+python3 scripts/gen_ios_project.py
+
+# 真机安装：签名用本机已登录的 Apple ID（自动化签名）
+xcodebuild -project BreezeTTS-iOS.xcodeproj -scheme BreezeTTSiOS \
+  -configuration Release -destination 'generic/platform=iOS' \
+  -archivePath /tmp/BreezeSpeak.xcarchive archive -allowProvisioningUpdates
+
+xcodebuild -exportArchive -archivePath /tmp/BreezeSpeak.xcarchive \
+  -exportPath /tmp/BreezeSpeak-ipa -exportOptionsPlist <(cat <<'P'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>method</key><string>debugging</string>
+<key>signingStyle</key><string>automatic</string>
+</dict></plist>
+P
+) -allowProvisioningUpdates
+
+xcrun devicectl device install app --device <UDID> /tmp/BreezeSpeak-ipa/BreezeTTS.ipa
+```
+
+手机端首次打开走五步引导（欢迎 → 协议 → 模型说明 → 连 Mac → 完成），「连 Mac」这步可以直接扫码，
+也可以先跳过，之后在设置里再连。iOS 端不含模型权重，所有推理都在 Mac 上。
 
 ## 命令行自检
 
@@ -125,18 +167,20 @@ $BIN --asr clip.wav zh-CN --out r.txt  # 语音识别（需 LaunchServices 启�
 ```
 BreezeTTS-macOS/
 ├─ BreezeTTS.xcodeproj        # 由 scripts/gen_project.py 生成，勿手改
+├─ BreezeTTS-iOS.xcodeproj    # 由 scripts/gen_ios_project.py 生成，勿手改
 ├─ BreezeTTS/
 │  ├─ App.swift               # 入口 + 窗口配置
-│  ├─ Core/                   # Paths / DeviceInfo / ModelCatalog / ModelSelection / AppSettings / AppModel / VoiceStyles（声线预设与推荐）/ GenerationEstimator（时长预估）
+│  ├─ Core/                   # Paths / DeviceInfo / ModelCatalog / ModelSelection / AppSettings / AppModel / VoiceStyles（声线预设与推荐）/ GenerationEstimator（时长预估）/ StoryParser / AudiobookRoles
 │  ├─ Bridge/                 # BreezeBridge.{h,mm} + 桥接头
-│  ├─ Services/               # SpeechEngine / AudioPlayer（流式）/ PlaybackService（成品播放）/ VoiceRecorder / SpeechTranscriber（语音识别）/ ModelDownloader / Stores / Export
+│  ├─ Services/               # SpeechEngine / AudioPlayer（流式）/ PlaybackService（成品播放）/ VoiceRecorder / SpeechTranscriber / ModelDownloader / Stores / Export / StoryAnalyzer（LLM 任务 A/B）/ RemoteServer（配对与远程接口）
 │  ├─ Models/                 # GenParams / VoiceMeta / HistoryItem
-│  ├─ UI/                     # DesignSystem（黑白 + 液态玻璃）/ MainView / VoiceMenu（二级菜单）/ OnboardingView / 各 sheet
-│  └─ Resources/AppIcon.icns
-├─ Vendor/                    # libbreeze.dylib + breeze.h（编译产物，勿提交）
+│  ├─ UI/                     # DesignSystem（黑白 + 液态玻璃）/ MainView / VoiceMenu / OnboardingView / PairingView / AudiobookSheet / RoleEditorSheet / 各 sheet
+│  └─ Resources/              # AppIcon.icns + llama-bin（听书/对话用 llama.cpp 子进程与依赖 dylib）
+├─ BreezeTTS-iOS/             # 手机端 App：MainSurface / RemoteAudiobookSheet / RemoteChatSheet / RemoteRoleSheet / MacLink / OnboardingFlow
+├─ Vendor/                    # libbreeze.dylib + breeze.h + libbreeze_core.a
 ├─ Breeze-TTS-2.Cpp/          # 上游源码 + 子模块
-├─ scripts/                   # build_mac.sh / build_app.sh / download_models.sh / gen_project.py
-├─ tools/                     # engine_smoke.c / generate_icon.swift
+├─ scripts/                   # build_mac.sh / build_app.sh / download_models.sh / gen_project.py / gen_ios_project.py / deploy.sh
+├─ tools/                     # engine_smoke.c / generate_icon.swift / helper（iPhone 唤醒助手）/ llama-src（脚本拉取，未提交）
 └─ docs/                      # BUILD.md（构建细节与坑）
 ```
 
