@@ -189,22 +189,22 @@ struct ComposerView: View {
             }
             .padding(.horizontal, 20).padding(.top, 6)
 
+            // 与 Mac 端一致：正文直接写在画布上，不套灰底卡片
             ZStack(alignment: .topLeading) {
                 if text.isEmpty {
                     Text("在这里输入要朗读的文本…")
                         .font(.system(size: 15))
                         .foregroundStyle(.tertiary)
-                        .padding(.leading, 17)
-                        .padding(.top, 17)
+                        .padding(.top, 1)
                         .allowsHitTesting(false)
                 }
                 TextEditor(text: $text)
                     .scrollContentBackground(.hidden)
                     .font(.system(size: 15))
-                    .padding(12)
+                    .padding(.horizontal, -5)
+                    .padding(.vertical, -6)
             }
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.faint))
-            .padding(.horizontal, 20).padding(.top, 10)
+            .padding(.horizontal, 20).padding(.top, 14)
 
             Spacer(minLength: 0)
 
