@@ -123,6 +123,19 @@ final class RemoteClient: ObservableObject {
         UserDefaults.standard.set(url.absoluteString, forKey: "remote.base")
     }
 
+    #if DEBUG
+    /// Debug-only: jump straight into the connected UI so screenshots and UI checks
+    /// do not need a manual pairing round-trip.
+    func debugAutoConnect(host: String, port: Int) {
+        guard let url = Self.makeBaseURL(host: host, port: port) else { return }
+        setBase(url)
+        state = .ready
+        statusText = "已连接 Mac"
+        fetchSettings()
+        fetchHistory()
+    }
+    #endif
+
     func disconnect() {
         pollTimer?.invalidate()
         pollTimer = nil

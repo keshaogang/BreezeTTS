@@ -5,11 +5,13 @@
 /* Begin PBXBuildFile section */
 		3C3E7561C74959FC84406BB4 /* App.swift */ = {isa = PBXBuildFile; fileRef = 5BE1D82FBE135137AA7CE5FA /* App.swift */; };
 		A99AECD560AA5FB9913B408C /* Remote.swift */ = {isa = PBXBuildFile; fileRef = CFDA8DE14AA051DF9428FD74 /* Remote.swift */; };
+		E6CB18218598573FB3B02436 /* Assets.xcassets */ = {isa = PBXBuildFile; fileRef = 98474323B3335C42B302CB65 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		5BE1D82FBE135137AA7CE5FA /* App.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		CFDA8DE14AA051DF9428FD74 /* Remote.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Remote.swift; sourceTree = "<group>"; };
+		98474323B3335C42B302CB65 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "BreezeTTS-iOS/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
 		D856B00056E05F62A6F3E6A0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		481B333A17625434BAE79FB3 /* BreezeTTS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BreezeTTS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -19,7 +21,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		1F64C067ACF25034A5D092D5 = {isa = PBXGroup; children = (2DB1B284B5A85FA4A7713469, 481B333A17625434BAE79FB3); sourceTree = "<group>"; };
+		1F64C067ACF25034A5D092D5 = {isa = PBXGroup; children = (2DB1B284B5A85FA4A7713469, 98474323B3335C42B302CB65 /* Assets.xcassets */, 481B333A17625434BAE79FB3); sourceTree = "<group>"; };
 		2DB1B284B5A85FA4A7713469 /* Sources */ = {isa = PBXGroup; children = (D856B00056E05F62A6F3E6A0, 5BE1D82FBE135137AA7CE5FA /* App.swift */, CFDA8DE14AA051DF9428FD74 /* Remote.swift */); path = BreezeTTS-iOS/Sources; sourceTree = SOURCE_ROOT; };
 /* End PBXGroup section */
 
@@ -32,7 +34,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		0AB1A3D32A905C4C9F11CDB4 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		0AB1A3D32A905C4C9F11CDB4 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (E6CB18218598573FB3B02436 /* Assets.xcassets */); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -47,7 +49,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -58,7 +60,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -71,13 +73,15 @@
 				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				OTHER_SWIFT_FLAGS = "-disable-sandbox";
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon";
 				INFOPLIST_FILE = "BreezeTTS-iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 			};
 			name = Debug;
 		};
@@ -90,10 +94,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				OTHER_SWIFT_FLAGS = "-disable-sandbox";
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon";
 				INFOPLIST_FILE = "BreezeTTS-iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;

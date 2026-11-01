@@ -12,6 +12,7 @@ for f in files:
 
 info_id, prod_id, group_id, main_id = uid("info"), uid("prod"), uid("grp"), uid("main")
 src_id, fw_id, res_id = uid("srcphase"), uid("fwphase"), uid("resphase")
+assets_id, assets_build_id = uid("assets"), uid("bf:assets")
 target_id, proj_id = uid("target"), uid("proj")
 t_bcl, t_dbg, t_rel = uid("tbcl"), uid("tdbg"), uid("trel")
 p_bcl, p_dbg, p_rel = uid("pbcl"), uid("pdbg"), uid("prel")
@@ -26,8 +27,8 @@ def block(ident, settings, name):
 \t\t}};
 '''
 
-proj_dbg = block(p_dbg, [("ALWAYS_SEARCH_USER_PATHS","NO"),("IPHONEOS_DEPLOYMENT_TARGET","17.0"),("SDKROOT","iphoneos"),("SWIFT_VERSION","5.9"),("TARGETED_DEVICE_FAMILY","1")], "Debug")
-proj_rel = block(p_rel, [("ALWAYS_SEARCH_USER_PATHS","NO"),("IPHONEOS_DEPLOYMENT_TARGET","17.0"),("SDKROOT","iphoneos"),("SWIFT_VERSION","5.9"),("TARGETED_DEVICE_FAMILY","1")], "Release")
+proj_dbg = block(p_dbg, [("ALWAYS_SEARCH_USER_PATHS","NO"),("IPHONEOS_DEPLOYMENT_TARGET","17.0"),("SDKROOT","iphoneos"),("SWIFT_VERSION","5.9"),("TARGETED_DEVICE_FAMILY","\"1,2\"")], "Debug")
+proj_rel = block(p_rel, [("ALWAYS_SEARCH_USER_PATHS","NO"),("IPHONEOS_DEPLOYMENT_TARGET","17.0"),("SDKROOT","iphoneos"),("SWIFT_VERSION","5.9"),("TARGETED_DEVICE_FAMILY","\"1,2\"")], "Release")
 common_target = [
     ("PRODUCT_BUNDLE_IDENTIFIER",'"com.breezespeak.app"'),
     ("PRODUCT_NAME",'"BreezeTTS"'),
@@ -35,15 +36,16 @@ common_target = [
     ("CODE_SIGN_STYLE","Automatic"),
     ("CODE_SIGN_IDENTITY",'"Apple Development"'),
     ("OTHER_SWIFT_FLAGS",'"-disable-sandbox"'),
+    ("ASSETCATALOG_COMPILER_APPICON_NAME",'"AppIcon"'),
     ("INFOPLIST_FILE",'"BreezeTTS-iOS/Info.plist"'),
     ("LD_RUNPATH_SEARCH_PATHS",'"@executable_path/Frameworks"'),
     ("SWIFT_EMIT_LOC_STRINGS","YES"),
-    ("TARGETED_DEVICE_FAMILY","1"),
+    ("TARGETED_DEVICE_FAMILY",'"1,2"'),
     ("IPHONEOS_DEPLOYMENT_TARGET","17.0"),
     ("SDKROOT","iphoneos"),
     ("SWIFT_VERSION","5.9"),
 ]
-t_dbg_b = block(t_dbg, common_target, "Debug")
+t_dbg_b = block(t_dbg, common_target + [("SWIFT_ACTIVE_COMPILATION_CONDITIONS", "DEBUG")], "Debug")
 t_rel_b = block(t_rel, common_target, "Release")
 
 pbx = f'''// !$*UTF8*$!
@@ -52,10 +54,12 @@ pbx = f'''// !$*UTF8*$!
 \tobjects = {{
 /* Begin PBXBuildFile section */
 {chr(10).join(build_files)}
+\t\t{assets_build_id} /* Assets.xcassets */ = {{isa = PBXBuildFile; fileRef = {assets_id} /* Assets.xcassets */; }};
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 {chr(10).join(file_refs)}
+\t\t{assets_id} /* Assets.xcassets */ = {{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "BreezeTTS-iOS/Assets.xcassets"; sourceTree = SOURCE_ROOT; }};
 \t\t{info_id} /* Info.plist */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; }};
 \t\t{prod_id} /* BreezeTTS.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BreezeTTS.app; sourceTree = BUILT_PRODUCTS_DIR; }};
 /* End PBXFileReference section */
@@ -65,7 +69,7 @@ pbx = f'''// !$*UTF8*$!
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-\t\t{main_id} = {{isa = PBXGroup; children = ({group_id}, {prod_id}); sourceTree = "<group>"; }};
+\t\t{main_id} = {{isa = PBXGroup; children = ({group_id}, {assets_id} /* Assets.xcassets */, {prod_id}); sourceTree = "<group>"; }};
 \t\t{group_id} /* Sources */ = {{isa = PBXGroup; children = ({info_id}, {", ".join(group_children)}); path = BreezeTTS-iOS/Sources; sourceTree = SOURCE_ROOT; }};
 /* End PBXGroup section */
 
@@ -78,7 +82,7 @@ pbx = f'''// !$*UTF8*$!
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-\t\t{res_id} = {{isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; }};
+\t\t{res_id} = {{isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({assets_build_id} /* Assets.xcassets */); runOnlyForDeploymentPostprocessing = 0; }};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */

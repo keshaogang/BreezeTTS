@@ -76,7 +76,16 @@ struct RootView: View {
             if let data = note.object as? Data { player.play(data, title: "刚生成的语音") }
         }
         .sheet(isPresented: $showSettings) { SettingsSheet(client: client) }
-        .task { client.startBrowsing() }
+        .task {
+            #if DEBUG
+            let env = ProcessInfo.processInfo.environment
+            if let host = env["BREEZE_DEBUG_HOST"], !host.isEmpty {
+                client.debugAutoConnect(host: host,
+                                        port: Int(env["BREEZE_DEBUG_PORT"] ?? "") ?? 4748)
+            }
+            #endif
+            client.startBrowsing()
+        }
         .onDisappear { client.stopBrowsing() }
     }
 
@@ -86,20 +95,31 @@ struct RootView: View {
         @ObservedObject var client: RemoteClient
         @ObservedObject var player: AudioBox
         @State private var showSettings = false
+        @State private var tab = 0
 
         var body: some View {
             VStack(spacing: 0) {
                 header
-                TabView {
+                TabView(selection: $tab) {
                     ComposerView(client: client, player: player)
                         .tabItem { Label("合成", systemImage: "waveform") }
+                        .tag(0)
                     NavigationStack { AudiobookContent(client: client, player: player) }
                         .tabItem { Label("听书", systemImage: "book") }
+                        .tag(1)
                     if client.macChatEnabled {
                         ChatTab(client: client, player: player)
                             .tabItem { Label("对话", systemImage: "bubble.left.and.bubble.right") }
+                            .tag(2)
                     }
                 }
+            }
+            .task {
+                #if DEBUG
+                let env = ProcessInfo.processInfo.environment
+                if let raw = env["BREEZE_DEBUG_TAB"], let value = Int(raw) { tab = value }
+                if env["BREEZE_DEBUG_SETTINGS"] == "1" { showSettings = true }
+                #endif
             }
         }
 
@@ -169,12 +189,22 @@ struct ComposerView: View {
             }
             .padding(.horizontal, 20).padding(.top, 6)
 
-            TextEditor(text: $text)
-                .scrollContentBackground(.hidden)
-                .font(.system(size: 15))
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.faint))
-                .padding(.horizontal, 20).padding(.top, 10)
+            ZStack(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text("在这里输入要朗读的文本…")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, 17)
+                        .padding(.top, 17)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: $text)
+                    .scrollContentBackground(.hidden)
+                    .font(.system(size: 15))
+                    .padding(12)
+            }
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.faint))
+            .padding(.horizontal, 20).padding(.top, 10)
 
             Spacer(minLength: 0)
 
@@ -521,12 +551,22 @@ struct AudiobookContent: View {
         ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if client.abCharacters.isEmpty && !client.abAnalyzing && !client.abGenerating {
-                        TextEditor(text: $text)
-                            .scrollContentBackground(.hidden)
-                            .font(.system(size: 14))
-                            .frame(minHeight: 180)
-                            .padding(10)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.faint))
+                        ZStack(alignment: .topLeading) {
+                            if text.isEmpty {
+                                Text("粘贴小说正文，至少 20 个字…")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.leading, 15)
+                                    .padding(.top, 17)
+                                    .allowsHitTesting(false)
+                            }
+                            TextEditor(text: $text)
+                                .scrollContentBackground(.hidden)
+                                .font(.system(size: 14))
+                                .frame(minHeight: 180)
+                                .padding(10)
+                        }
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.faint))
                         Button {
                             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard trimmed.count >= 20 else { return }
@@ -1085,7 +1125,12 @@ struct QRScannerView: UIViewRepresentable {
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
 
         func start() {
+            // The preview layer is the view's own layer; bind it once on the main
+            // thread or the camera feed never shows up (black screen, no scan).
             previewLayer.videoGravity = .resizeAspectFill
+            if previewLayer.session !== session {
+                previewLayer.session = session
+            }
             queue.async { [weak self] in
                 guard let self else { return }
                 guard let device = AVCaptureDevice.default(for: .video),
